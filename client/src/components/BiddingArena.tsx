@@ -31,7 +31,7 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
     if (!draft) return;
     const interval = setInterval(() => {
       const remaining = Math.max(0, Math.ceil((draft.timerEndTimestamp - Date.now()) / 1000));
-      setTimeLeft(prev => {
+      setTimeLeft((prev: number) => {
         if (prev !== remaining && remaining <= 5 && remaining > 0) {
           audio.playTickSound();
         }

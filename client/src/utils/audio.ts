@@ -157,7 +157,7 @@ class AudioManager {
     osc.stop(this.ctx.currentTime + 0.05);
   }
 
-  playRouletteLockSound(isWinner: boolean) {
+  playRouletteLockSound() {
     this.init();
     if (!this.ctx || this.sfxVolume <= 0) return;
     

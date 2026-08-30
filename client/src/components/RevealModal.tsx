@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchPokemonDetails, type PokemonDetails, getTypeColor } from '../utils/pokemon';
 
 export const RevealModal = ({

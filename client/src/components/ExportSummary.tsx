@@ -1,16 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchPokemonDetails, generateShowdownText, type PokemonDetails } from '../utils/pokemon';
 
 export const ExportSummary = ({ 
   room,
   socket,
-  playerId,
-  onLeave
+  playerId
 }: { 
   room: any;
   socket: any;
   playerId: string;
-  onLeave?: () => void;
 }) => {
   const [teamData, setTeamData] = useState<Record<string, PokemonDetails[]>>({});
   const [loading, setLoading] = useState(true);

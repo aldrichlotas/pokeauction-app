@@ -1,5 +1,3 @@
-import React from 'react';
-
 export const RosterDrawer = ({ room }: { room: any }) => {
   
   // Use Object.values directly to maintain the stable join/turn order

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchPokemonDetails, type PokemonDetails, getTypeColor } from '../utils/pokemon';
 import { audio } from '../utils/audio';
 
@@ -48,7 +48,7 @@ export const RouletteModal = ({
       setTimeout(() => {
         setLockedIndex(index);
         activeSpins--;
-        audio.playRouletteLockSound(isWinner);
+        audio.playRouletteLockSound();
         
         fetchPokemonDetails(id).then(details => {
           setLockedDetails(prev => {
