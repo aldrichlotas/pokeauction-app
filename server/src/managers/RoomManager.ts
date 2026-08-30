@@ -48,9 +48,18 @@ export class RoomManager {
 
     if (room.state !== 'LOBBY') return null;
 
+    let finalName = playerName.trim();
+    let counter = 1;
+    const existingNames = Object.values(room.players).map(p => p.name.toLowerCase());
+    
+    while (existingNames.includes(finalName.toLowerCase())) {
+      finalName = `${playerName.trim()} (${counter})`;
+      counter++;
+    }
+
     room.players[playerId] = {
       id: playerId,
-      name: playerName,
+      name: finalName,
       balance: 25,
       party: [],
       status: 'active',
