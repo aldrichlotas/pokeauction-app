@@ -12,6 +12,16 @@ export interface Player {
   wantsToPlayAgain?: boolean;
 }
 
+export interface Match {
+  id: string;
+  roundIndex: number;
+  matchIndex: number;
+  player1Id: string | null;
+  player2Id: string | null;
+  winnerId: string | null;
+  nextMatchId: string | null;
+}
+
 export type DraftState = 'LOBBY' | 'BIDDING' | 'REVEAL' | 'AUTOFILL_ROULETTE' | 'DRAFT_END';
 
 export interface Room {
@@ -31,4 +41,5 @@ export interface Room {
     roundNumber: number;
     turnRotationIndex: number;
   } | null;
+  bracket: Match[][] | null;
 }

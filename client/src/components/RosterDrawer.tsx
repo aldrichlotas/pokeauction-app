@@ -5,10 +5,16 @@ export const RosterDrawer = ({ room }: { room: any }) => {
 
   return (
     <div className="roster-drawer">
-      {players.map((p: any) => (
-        <div key={p.id} className="glass-panel player-card">
-          <div className="player-card-header">
-            <span className="player-name">{p.name}</span>
+      {players.map((p: any, index: number) => {
+        const isOpener = room.currentDraft && room.currentDraft.turnRotationIndex === index;
+        
+        return (
+          <div key={p.id} className={`glass-panel player-card ${isOpener ? 'opener-highlight' : ''}`}>
+            <div className="player-card-header">
+              <span className="player-name">
+                {p.name}
+                {isOpener && <span style={{ marginLeft: '8px', fontSize: '0.7rem', color: 'var(--accent-color)', border: '1px solid var(--accent-color)', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 800 }}>Opener</span>}
+              </span>
             <span className="player-balance">${p.balance}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -26,7 +32,8 @@ export const RosterDrawer = ({ room }: { room: any }) => {
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

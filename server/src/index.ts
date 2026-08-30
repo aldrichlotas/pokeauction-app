@@ -72,6 +72,11 @@ io.on('connection', (socket) => {
     if (playerId) roomManager.togglePlayAgain(roomId, playerId);
   });
 
+  socket.on('update_bracket', ({ roomId, matchId, winnerId }) => {
+    const playerId = socketToPlayerId.get(socket.id);
+    if (playerId) roomManager.updateBracket(roomId, playerId, matchId, winnerId);
+  });
+
   socket.on('leave_room', ({ roomId }) => {
     const playerId = socketToPlayerId.get(socket.id);
     if (playerId) {

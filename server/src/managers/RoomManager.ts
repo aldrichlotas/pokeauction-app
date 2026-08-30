@@ -1,5 +1,5 @@
 import { Server } from 'socket.io';
-import { Room, Player, DraftState } from '../types';
+import { Room, Player, DraftState, Match } from '../types';
 
 export class RoomManager {
   private rooms: Map<string, Room> = new Map();
@@ -32,6 +32,7 @@ export class RoomManager {
         dexEnd: 1025,
       },
       currentDraft: null,
+      bracket: null,
     };
     this.rooms.set(roomId, newRoom);
     return newRoom;
@@ -103,6 +104,7 @@ export class RoomManager {
 
     if (activePlayers.length === 0) {
       room.state = 'DRAFT_END';
+      this.generateBracket(roomId);
       this.io.to(roomId).emit('room_update', room);
       this.io.to(roomId).emit('draft_complete');
       return;
@@ -139,6 +141,7 @@ export class RoomManager {
            const r = this.rooms.get(roomId);
            if (r) {
              r.state = 'DRAFT_END';
+             this.generateBracket(roomId);
              this.io.to(roomId).emit('room_update', r);
              this.io.to(roomId).emit('draft_complete');
            }
@@ -146,6 +149,7 @@ export class RoomManager {
         return;
       } else {
         room.state = 'DRAFT_END';
+        this.generateBracket(roomId);
         this.io.to(roomId).emit('room_update', room);
         this.io.to(roomId).emit('draft_complete');
         return;
@@ -179,6 +183,7 @@ export class RoomManager {
 
     if (!openerId) {
        room.state = 'DRAFT_END';
+       this.generateBracket(roomId);
        this.io.to(roomId).emit('room_update', room);
        this.io.to(roomId).emit('draft_complete');
        return;
@@ -328,19 +333,175 @@ export class RoomManager {
       // Reset room back to lobby state
       room.state = 'LOBBY';
       room.currentDraft = null;
+      room.bracket = null;
       
-      Object.values(room.players).forEach(p => {
-        p.balance = 25;
-        p.party = [];
-        p.status = 'active';
-        p.wantsToPlayAgain = false;
-        p.ready = false; // Force them to explicitly ready up again in the lobby
+      let needsNewHost = false;
+
+      Object.keys(room.players).forEach(pid => {
+        const p = room.players[pid];
+        if (!p.isOnline) {
+          if (p.isHost) needsNewHost = true;
+          delete room.players[pid];
+        } else {
+          p.balance = 25;
+          p.party = [];
+          p.status = 'active';
+          p.wantsToPlayAgain = false;
+          p.ready = false; // Force them to explicitly ready up again in the lobby
+        }
       });
+
+      if (needsNewHost) {
+        const firstOnline = Object.values(room.players).find(p => p.isOnline);
+        if (firstOnline) {
+           firstOnline.isHost = true;
+        }
+      }
       
       this.io.to(roomId).emit('room_update', room);
     } else {
       // Broadcast updated play again statuses
       this.io.to(roomId).emit('room_update', room);
     }
+  }
+
+  private generateBracket(roomId: string) {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    const players = Object.values(room.players).filter(p => p.party.length > 0);
+    if (players.length < 2) {
+      room.bracket = null;
+      return;
+    }
+
+    // Shuffle players
+    const shuffled = [...players].sort(() => Math.random() - 0.5);
+    const N = shuffled.length;
+    const numRounds = Math.ceil(Math.log2(N));
+    const bracketSize = Math.pow(2, numRounds);
+    
+    // Create the full perfect tree first (from finals down to round 1)
+    const rounds: Match[][] = [];
+    
+    for (let r = 0; r < numRounds; r++) {
+      rounds.push([]);
+      const matchesInRound = Math.pow(2, numRounds - 1 - r);
+      for (let m = 0; m < matchesInRound; m++) {
+        rounds[r].push({
+          id: `r${r}-m${m}`,
+          roundIndex: r,
+          matchIndex: m,
+          player1Id: null,
+          player2Id: null,
+          winnerId: null,
+          nextMatchId: r < numRounds - 1 ? `r${r + 1}-m${Math.floor(m / 2)}` : null
+        });
+      }
+    }
+
+    // Helper function to generate standard tournament seeding
+    // Example: size 8 -> [1, 8, 4, 5, 2, 7, 3, 6]
+    const getStandardSeeding = (size: number): number[] => {
+      if (size === 1) return [1];
+      let seeds = [1, 2];
+      while (seeds.length < size) {
+        const nextSeeds = [];
+        const sum = seeds.length * 2 + 1;
+        for (let i = 0; i < seeds.length; i++) {
+          nextSeeds.push(seeds[i]);
+          nextSeeds.push(sum - seeds[i]);
+        }
+        seeds = nextSeeds;
+      }
+      return seeds;
+    };
+
+    const seeds = getStandardSeeding(bracketSize);
+    
+    // Distribute players to first round matches based on seeding
+    // seeds array determines the index of the player in the shuffled array (seed 1 = index 0)
+    for (let m = 0; m < rounds[0].length; m++) {
+      const p1SeedIndex = seeds[m * 2] - 1;
+      const p2SeedIndex = seeds[m * 2 + 1] - 1;
+      
+      rounds[0][m].player1Id = p1SeedIndex < N ? shuffled[p1SeedIndex].id : null;
+      rounds[0][m].player2Id = p2SeedIndex < N ? shuffled[p2SeedIndex].id : null;
+    }
+
+    // Process Byes
+    for (let i = 0; i < rounds[0].length; i++) {
+      const match = rounds[0][i];
+      if (match.player1Id && !match.player2Id) {
+        match.winnerId = match.player1Id; 
+        const nextMatch = rounds[1].find(m => m.id === match.nextMatchId);
+        if (nextMatch) {
+          if (match.matchIndex % 2 === 0) nextMatch.player1Id = match.winnerId;
+          else nextMatch.player2Id = match.winnerId;
+        }
+      } else if (!match.player1Id && match.player2Id) {
+         match.winnerId = match.player2Id;
+         const nextMatch = rounds[1].find(m => m.id === match.nextMatchId);
+         if (nextMatch) {
+           if (match.matchIndex % 2 === 0) nextMatch.player1Id = match.winnerId;
+           else nextMatch.player2Id = match.winnerId;
+         }
+      }
+    }
+
+    room.bracket = rounds;
+  }
+
+  updateBracket(roomId: string, playerId: string, matchId: string, winnerId: string) {
+    const room = this.rooms.get(roomId);
+    if (!room || !room.bracket) return;
+    
+    const player = room.players[playerId];
+    if (!player || !player.isHost) return; 
+    
+    // Find the match
+    let targetMatch = null;
+    let targetR = -1;
+    for (let r = 0; r < room.bracket.length; r++) {
+      for (let m = 0; m < room.bracket[r].length; m++) {
+        if (room.bracket[r][m].id === matchId) {
+          targetMatch = room.bracket[r][m];
+          targetR = r;
+          break;
+        }
+      }
+    }
+    
+    if (!targetMatch) return;
+    
+    // Don't allow advancing if both players aren't set
+    if (!targetMatch.player1Id || !targetMatch.player2Id) return;
+
+    // If changing the winner, we must clear this player from future rounds
+    targetMatch.winnerId = winnerId;
+    
+    // Propagate forward using Cascade Undo system
+    let currentMatch = targetMatch;
+    let r = targetR;
+    while (currentMatch.nextMatchId) {
+       const nextRound = room.bracket[r + 1];
+       const nextMatch = nextRound.find(x => x.id === currentMatch.nextMatchId);
+       if (!nextMatch) break;
+       
+       if (currentMatch.matchIndex % 2 === 0) {
+         nextMatch.player1Id = currentMatch.winnerId;
+       } else {
+         nextMatch.player2Id = currentMatch.winnerId;
+       }
+       
+       // If the next match ALREADY had a winner, and we just changed one of the participants,
+       // we invalidate the winner of the next match to be safe.
+       nextMatch.winnerId = null; 
+       
+       currentMatch = nextMatch;
+       r++;
+    }
+    
+    this.io.to(roomId).emit('room_update', room);
   }
 }

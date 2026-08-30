@@ -19,6 +19,9 @@ export const RouletteModal = ({
   useEffect(() => {
     if (wonPokemonIds.length === 0) return;
     
+    // Explicitly reset states so re-renders or Strict Mode don't break the animation start
+    setSpinActive(false);
+    setLockedIndex(-1);
     setLockedDetails(wonPokemonIds.map(() => null));
 
     // Generate reels
@@ -32,9 +35,13 @@ export const RouletteModal = ({
     });
     setReels(newReels);
 
-    setTimeout(() => {
+    let timeouts: ReturnType<typeof setTimeout>[] = [];
+
+    // Force a small delay to ensure the DOM paints at 0px before we activate the transition
+    const spinTimeout = setTimeout(() => {
       setSpinActive(true);
-    }, 50);
+    }, 100);
+    timeouts.push(spinTimeout);
 
     let activeSpins = wonPokemonIds.length;
     const tickInterval = setInterval(() => {
@@ -45,7 +52,7 @@ export const RouletteModal = ({
       // Exact duration to match CSS transition
       const durationMs = 1500 + (index * 1000);
       
-      setTimeout(() => {
+      const lockTimeout = setTimeout(() => {
         setLockedIndex(index);
         activeSpins--;
         audio.playRouletteLockSound();
@@ -59,15 +66,20 @@ export const RouletteModal = ({
         });
 
         if (index === wonPokemonIds.length - 1) {
-          setTimeout(() => {
+          const jackpotTimeout = setTimeout(() => {
             audio.playJackpotSound();
             clearInterval(tickInterval);
           }, 500);
+          timeouts.push(jackpotTimeout);
         }
       }, durationMs);
+      timeouts.push(lockTimeout);
     });
 
-    return () => clearInterval(tickInterval);
+    return () => {
+      clearInterval(tickInterval);
+      timeouts.forEach(t => clearTimeout(t));
+    };
   }, [wonPokemonIds, isWinner]);
 
   if (reels.length === 0) return null;
@@ -147,9 +159,7 @@ export const RouletteModal = ({
                    display: 'flex',
                    flexDirection: 'column',
                    alignItems: 'center',
-                   // Make the physical CSS animation finish 250ms BEFORE the JS timeout fires.
-                   // This guarantees the reel has completely stopped before the name appears.
-                   transition: spinActive ? `transform ${Math.max(0.1, duration - 0.25)}s cubic-bezier(0.1, 0.7, 0.1, 1)` : 'none',
+                   transition: `transform ${Math.max(0.1, duration - 0.25)}s cubic-bezier(0.1, 0.7, 0.1, 1)`,
                    transform: spinActive ? `translateY(-${20 * 180}px)` : 'translateY(0px)'
                  }}>
                    {reel.map((id, idx) => (
