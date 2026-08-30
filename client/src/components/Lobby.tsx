@@ -52,7 +52,7 @@ export const Lobby = ({
         <div className="glass-panel lobby-card">
           <h1>Room: {room.id}</h1>
           <div style={{ textAlign: 'left', width: '100%' }}>
-            <h3>Players ({Object.keys(room.players).length}/6)</h3>
+            <h3>Players ({Object.keys(room.players).length})</h3>
             <ul style={{ listStyle: 'none', padding: '1rem 0' }}>
               {Object.values(room.players).map((p: any) => (
                 <li key={p.id} style={{ padding: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
