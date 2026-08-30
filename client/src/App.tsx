@@ -177,7 +177,7 @@ function App() {
         <button className="btn btn-secondary" style={{ position: 'absolute', top: 0, right: 0, zIndex: 10 }} onClick={handleLeave}>
           Leave Room
         </button>
-        <ExportSummary room={room} socket={socket} playerId={playerId} onLeave={handleLeave} />
+        <ExportSummary room={room} socket={socket} playerId={playerId} />
       </div>
     );
   }
