@@ -5,6 +5,7 @@ export class RoomManager {
   private rooms: Map<string, Room> = new Map();
   private io: Server;
   private timers: Map<string, NodeJS.Timeout> = new Map();
+  private playerCooldowns: Map<string, number> = new Map();
 
   constructor(io: Server) {
     this.io = io;
@@ -33,6 +34,8 @@ export class RoomManager {
       },
       currentDraft: null,
       bracket: null,
+      activeVote: null,
+      chatMessages: [],
     };
     this.rooms.set(roomId, newRoom);
     return newRoom;
@@ -226,18 +229,52 @@ export class RoomManager {
     this.timers.set(roomId, timeout);
   }
 
-  placeBid(roomId: string, playerId: string, amount: number) {
+  placeBid(roomId: string, playerId: string, amount: number, socketId: string) {
     const room = this.rooms.get(roomId);
     if (!room || room.state !== 'BIDDING' || !room.currentDraft) return;
 
     const player = room.players[playerId];
     if (!player || player.status !== 'active') return;
 
-    if (amount <= room.currentDraft.currentBid) return;
-    if (amount > player.balance) return;
+    // 1. Bid Cooldown
+    const now = Date.now();
+    const lastBidTime = this.playerCooldowns.get(playerId) || 0;
+    if (now - lastBidTime < 1000) {
+      this.io.to(socketId).emit('bid_rejected', { reason: 'Bidding too fast! Please wait a moment.' });
+      return;
+    }
+
+    // 2. Simultaneous Bid Resolution / Validation
+    if (amount <= room.currentDraft.currentBid) {
+      this.io.to(socketId).emit('bid_rejected', { reason: 'Bid rejected: Someone already bid higher!' });
+      return;
+    }
+
+    if (amount > player.balance) {
+      this.io.to(socketId).emit('bid_rejected', { reason: 'Bid rejected: Insufficient funds!' });
+      return;
+    }
+
+    this.playerCooldowns.set(playerId, now);
 
     room.currentDraft.currentBid = amount;
     room.currentDraft.highestBidderId = playerId;
+    
+    // 3. Soft Reset Timer (Anti-snipe)
+    if (room.currentDraft.timerEndTimestamp) {
+      const timeRemaining = room.currentDraft.timerEndTimestamp - now;
+      if (timeRemaining > 0 && timeRemaining < 5000) {
+        room.currentDraft.timerEndTimestamp = now + 5000; // Reset to 5 seconds
+        
+        if (this.timers.has(roomId)) {
+          clearTimeout(this.timers.get(roomId)!);
+        }
+        const timeout = setTimeout(() => {
+          this.resolveRound(roomId);
+        }, 5000);
+        this.timers.set(roomId, timeout);
+      }
+    }
     
     // Auto-fold players who cannot afford to outbid the new current bid
     let playersPassed = false;
@@ -249,10 +286,6 @@ export class RoomManager {
         }
       }
     });
-    
-    // Reset timer
-    room.currentDraft.timerEndTimestamp = Date.now() + room.settings.timerDuration * 1000;
-    this.startTimer(roomId);
 
     this.io.to(roomId).emit('room_update', room);
     
@@ -511,6 +544,126 @@ export class RoomManager {
        r++;
     }
     
+     this.io.to(roomId).emit('room_update', room);
+  }
+
+  sendChat(roomId: string, senderId: string, text: string) {
+    const room = this.rooms.get(roomId);
+    if (!room || !room.players[senderId]) return;
+
+    if (text.trim().toLowerCase().startsWith('/votekick ')) {
+      const targetName = text.trim().substring(10).trim().toLowerCase();
+      
+      if (room.activeVote) {
+        this.sendSystemMessage(roomId, `A vote is already in progress against ${room.players[room.activeVote.targetId]?.name}.`);
+        return;
+      }
+      
+      const targetPlayer = Object.values(room.players).find(p => p.name.toLowerCase() === targetName);
+      if (!targetPlayer) {
+        this.sendSystemMessage(roomId, `Could not find a player named "${targetName}".`);
+        return;
+      }
+
+      if (targetPlayer.id === senderId) {
+        this.sendSystemMessage(roomId, `You cannot vote to kick yourself!`);
+        return;
+      }
+
+      // Start the vote
+      room.activeVote = {
+        targetId: targetPlayer.id,
+        callerId: senderId,
+        yesVotes: [senderId], // Caller automatically votes yes
+        noVotes: [],
+        expiresAt: Date.now() + 30000,
+      };
+
+      this.sendSystemMessage(roomId, `${room.players[senderId].name} initiated a vote to kick ${targetPlayer.name}. Type /yes or /no in chat to vote.`);
+      
+      // Auto-fail vote if time expires
+      setTimeout(() => {
+        const r = this.rooms.get(roomId);
+        if (r && r.activeVote && r.activeVote.targetId === targetPlayer.id) {
+          r.activeVote = null;
+          this.sendSystemMessage(roomId, `Vote to kick ${targetPlayer.name} failed (Timeout).`);
+          this.io.to(roomId).emit('room_update', r);
+        }
+      }, 30000);
+
+      this.io.to(roomId).emit('room_update', room);
+      return; // Do not emit the command text as a chat message
+    }
+
+    const normalizedText = text.trim().toLowerCase();
+    if (normalizedText === '/yes' || normalizedText === '/no') {
+      if (room.activeVote) {
+        this.castVote(roomId, senderId, normalizedText.replace('/', '') as 'yes' | 'no');
+        return;
+      }
+    }
+
+    const message = {
+      id: Math.random().toString(36).substring(2, 9),
+      senderId,
+      senderName: room.players[senderId].name,
+      text,
+      timestamp: Date.now(),
+    };
+
+    room.chatMessages.push(message);
+    if (room.chatMessages.length > 50) {
+      room.chatMessages.shift(); // Keep only last 50
+    }
+
+    this.io.to(roomId).emit('room_update', room);
+  }
+
+  sendSystemMessage(roomId: string, text: string) {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+    room.chatMessages.push({
+      id: Math.random().toString(36).substring(2, 9),
+      senderId: 'SYSTEM',
+      senderName: 'SYSTEM',
+      text,
+      timestamp: Date.now(),
+    });
+    this.io.to(roomId).emit('room_update', room);
+  }
+
+  castVote(roomId: string, voterId: string, vote: 'yes' | 'no') {
+    const room = this.rooms.get(roomId);
+    if (!room || !room.activeVote || !room.players[voterId]) return;
+    
+    const active = room.activeVote;
+    if (active.targetId === voterId) {
+      this.sendSystemMessage(roomId, `The target of the vote cannot vote.`);
+      return;
+    }
+    if (active.yesVotes.includes(voterId) || active.noVotes.includes(voterId)) return; // Already voted
+
+    if (vote === 'yes') active.yesVotes.push(voterId);
+    else active.noVotes.push(voterId);
+
+    const onlinePlayers = Object.values(room.players).filter(p => p.isOnline).length;
+    const votesNeeded = Math.max(1, Math.floor(onlinePlayers / 2) + 1); // Strict majority
+    
+    this.sendSystemMessage(roomId, `${room.players[voterId]?.name} voted ${vote}. (${active.yesVotes.length}/${votesNeeded} needed to pass)`);
+
+    if (active.yesVotes.length >= votesNeeded) {
+      // Kick them!
+      const targetName = room.players[active.targetId]?.name || 'Player';
+      this.handleDisconnect(active.targetId); // Clean up if mid-game or pass them
+      delete room.players[active.targetId];
+      room.activeVote = null;
+      this.sendSystemMessage(roomId, `Vote passed! ${targetName} was kicked.`);
+    } else if (active.noVotes.length >= votesNeeded) {
+      // Failed!
+      room.activeVote = null;
+      this.sendSystemMessage(roomId, `Vote failed. Not enough players voted yes.`);
+    }
+
     this.io.to(roomId).emit('room_update', room);
   }
 }

@@ -59,7 +59,7 @@ io.on('connection', (socket) => {
   
   socket.on('place_bid', ({ roomId, amount }) => {
     const playerId = socketToPlayerId.get(socket.id);
-    if (playerId) roomManager.placeBid(roomId, playerId, amount);
+    if (playerId) roomManager.placeBid(roomId, playerId, amount, socket.id);
   });
   
   socket.on('pass_bid', ({ roomId }) => {
@@ -75,6 +75,16 @@ io.on('connection', (socket) => {
   socket.on('update_bracket', ({ roomId, matchId, winnerId }) => {
     const playerId = socketToPlayerId.get(socket.id);
     if (playerId) roomManager.updateBracket(roomId, playerId, matchId, winnerId);
+  });
+
+  socket.on('send_chat', ({ roomId, text }) => {
+    const playerId = socketToPlayerId.get(socket.id);
+    if (playerId) roomManager.sendChat(roomId, playerId, text);
+  });
+
+  socket.on('cast_vote', ({ roomId, vote }) => {
+    const playerId = socketToPlayerId.get(socket.id);
+    if (playerId) roomManager.castVote(roomId, playerId, vote);
   });
 
   socket.on('leave_room', ({ roomId }) => {

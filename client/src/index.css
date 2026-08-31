@@ -479,3 +479,18 @@ input[type=range]::-webkit-slider-runnable-track {
   background: rgba(255,255,255,0.2);
   border-radius: 2px;
 }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* Hide scrollbars */
+::-webkit-scrollbar { 
+  display: none; 
+}
+
+* { 
+  -ms-overflow-style: none; 
+  scrollbar-width: none; 
+}

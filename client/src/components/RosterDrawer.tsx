@@ -1,4 +1,10 @@
-export const RosterDrawer = ({ room }: { room: any }) => {
+
+
+interface RosterDrawerProps {
+  room: any;
+}
+
+export const RosterDrawer = ({ room }: RosterDrawerProps) => {
   
   // Use Object.values directly to maintain the stable join/turn order
   const players = Object.values(room.players) as any[];

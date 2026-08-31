@@ -5,6 +5,7 @@ import { audio } from '../utils/audio';
 export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }) => {
   const [timeLeft, setTimeLeft] = useState(room.settings.timerDuration);
   const [customBid, setCustomBid] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   const draft = room.currentDraft;
   const player = room.players[playerId];
@@ -12,6 +13,17 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
 
   const previousBidRef = useRef(room.currentDraft?.currentBid || 0);
   const prevStatusRef = useRef(player.status);
+
+  useEffect(() => {
+    const handleReject = (data: { reason: string }) => {
+      setErrorMsg(data.reason);
+      setTimeout(() => setErrorMsg(''), 3000);
+    };
+    socket.on('bid_rejected', handleReject);
+    return () => {
+      socket.off('bid_rejected', handleReject);
+    };
+  }, []);
 
   useEffect(() => {
     if (draft && draft.currentBid > previousBidRef.current) {
@@ -91,6 +103,21 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
         <div className="bid-amount">${currentBid}</div>
         <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>by {highestBidder}</div>
       </div>
+
+      {errorMsg && (
+        <div style={{
+          background: 'rgba(255, 50, 50, 0.2)',
+          border: '1px solid var(--danger-color)',
+          color: 'white',
+          padding: '0.5rem 1rem',
+          borderRadius: '8px',
+          fontWeight: 'bold',
+          marginBottom: '1rem',
+          animation: 'shake 0.3s ease-in-out'
+        }}>
+          {errorMsg}
+        </div>
+      )}
 
       <div className="action-bar">
         {isActive ? (

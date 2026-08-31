@@ -22,6 +22,22 @@ export interface Match {
   nextMatchId: string | null;
 }
 
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: number;
+}
+
+export interface ActiveVote {
+  targetId: string;
+  callerId: string;
+  yesVotes: string[];
+  noVotes: string[];
+  expiresAt: number;
+}
+
 export type DraftState = 'LOBBY' | 'BIDDING' | 'REVEAL' | 'AUTOFILL_ROULETTE' | 'DRAFT_END';
 
 export interface Room {
@@ -42,4 +58,6 @@ export interface Room {
     turnRotationIndex: number;
   } | null;
   bracket: Match[][] | null;
+  activeVote: ActiveVote | null;
+  chatMessages: ChatMessage[];
 }

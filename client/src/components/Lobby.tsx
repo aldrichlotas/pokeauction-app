@@ -1,18 +1,23 @@
 import React, { useState } from 'react';
-import { socket } from '../socket';
+import { Socket } from 'socket.io-client';
+import { ChatBox } from './ChatBox';
 
 export const Lobby = ({ 
   room, 
+  socket,
   playerId,
   onJoin,
   onLeave,
-  volumeNode
+  volumeNode,
+  profileBadge
 }: { 
   room: any; 
+  socket: Socket;
   playerId: string;
   onJoin: (roomId: string, name: string) => void;
   onLeave: () => void;
   volumeNode?: React.ReactNode;
+  profileBadge?: React.ReactNode;
 }) => {
   const [playerName, setPlayerName] = useState('');
   const [roomIdInput, setRoomIdInput] = useState('');
@@ -48,38 +53,49 @@ export const Lobby = ({
 
   if (room) {
     return (
-      <div className="lobby-container animate-fade-in">
-        <div className="glass-panel lobby-card">
-          <h1>Room: {room.id}</h1>
-          <div style={{ textAlign: 'left', width: '100%' }}>
-            <h3>Players ({Object.keys(room.players).length})</h3>
-            <ul style={{ listStyle: 'none', padding: '1rem 0' }}>
-              {Object.values(room.players).map((p: any) => (
-                <li key={p.id} style={{ padding: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                  {p.name} {p.isHost ? '(Host)' : ''}
-                </li>
-              ))}
-            </ul>
+      <div className="lobby-container animate-fade-in" style={{ display: 'flex', gap: '2rem', maxWidth: '1200px', margin: '0 auto', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div className="glass-panel lobby-card" style={{ width: '100%' }}>
+            <h1>Room: {room.id}</h1>
+            <div style={{ textAlign: 'left', width: '100%' }}>
+              <h3>Players ({Object.keys(room.players).length})</h3>
+              <ul style={{ listStyle: 'none', padding: '1rem 0' }}>
+                {Object.values(room.players).map((p: any) => {
+                  return (
+                    <li key={p.id} style={{ padding: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{p.name} {p.isHost ? '(Host)' : ''}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+            {room.players[playerId]?.isHost ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <button className="btn btn-primary" onClick={handleStart}>
+                  Start Draft
+                </button>
+                <button className="btn btn-outline" onClick={onLeave}>
+                  Leave Room
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <p>Waiting for host to start...</p>
+                <button className="btn btn-outline" onClick={onLeave}>
+                  Leave Room
+                </button>
+              </div>
+            )}
           </div>
-          {room.players[playerId]?.isHost ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <button className="btn btn-primary" onClick={handleStart}>
-                Start Draft
-              </button>
-              <button className="btn btn-outline" onClick={onLeave}>
-                Leave Room
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <p>Waiting for host to start...</p>
-              <button className="btn btn-outline" onClick={onLeave}>
-                Leave Room
-              </button>
-            </div>
-          )}
+          <div style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', gap: '1.5rem', justifyContent: 'flex-start' }}>
+            {volumeNode}
+            {profileBadge}
+          </div>
         </div>
-        {volumeNode && <div style={{ marginTop: '2rem' }}>{volumeNode}</div>}
+        
+        <div style={{ width: '350px' }}>
+          <ChatBox room={room} socket={socket} playerId={playerId} />
+        </div>
       </div>
     );
   }
@@ -122,7 +138,10 @@ export const Lobby = ({
           </button>
         </div>
       </div>
-      {volumeNode && <div style={{ marginTop: '2rem' }}>{volumeNode}</div>}
+      <div style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', gap: '1.5rem', justifyContent: 'center' }}>
+        {volumeNode}
+        {profileBadge}
+      </div>
     </div>
   );
 };

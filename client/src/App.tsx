@@ -5,6 +5,7 @@ import { BiddingArena } from './components/BiddingArena';
 import { RosterDrawer } from './components/RosterDrawer';
 import { RevealModal } from './components/RevealModal';
 import { RouletteModal } from './components/RouletteModal';
+import { ChatBox } from './components/ChatBox';
 import { ExportSummary } from './components/ExportSummary';
 import { audio } from './utils/audio';
 
@@ -62,6 +63,12 @@ function App() {
     });
 
     socket.on('room_update', (updatedRoom: any) => {
+      if (!updatedRoom.players[playerId]) {
+        // Player was removed/kicked
+        setRoom(null);
+        localStorage.removeItem('poke_auction_room_id');
+        return;
+      }
       setRoom(updatedRoom);
       
       // If we are no longer in REVEAL state, clear reveal data
@@ -165,18 +172,30 @@ function App() {
     </div>
   );
 
+  const profileBadge = room && room.players[playerId] ? (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.1)', padding: '0.5rem 1rem', borderRadius: '50px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
+      <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.8rem', color: 'white' }}>
+        {room.players[playerId].name.charAt(0).toUpperCase()}
+      </div>
+      <span style={{ fontWeight: 600, color: 'white' }}>{room.players[playerId].name}</span>
+    </div>
+  ) : null;
+
   // Lobby State
   if (!room || room.state === 'LOBBY') {
-    return <Lobby room={room} playerId={playerId} onJoin={handleJoin} onLeave={handleLeave} volumeNode={volumeControls} />;
+    return <Lobby room={room} socket={socket} playerId={playerId} onJoin={handleJoin} onLeave={handleLeave} volumeNode={volumeControls} profileBadge={profileBadge} />;
   }
 
   // Draft End State
   if (room.state === 'DRAFT_END') {
     return (
       <div className="container" style={{ position: 'relative' }}>
-        <button className="btn btn-secondary" style={{ position: 'absolute', top: 0, right: 0, zIndex: 10 }} onClick={handleLeave}>
-          Leave Room
-        </button>
+        <div style={{ position: 'absolute', top: 0, right: 0, zIndex: 10, display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          {profileBadge}
+          <button className="btn btn-secondary" onClick={handleLeave}>
+            Leave Room
+          </button>
+        </div>
         <ExportSummary room={room} socket={socket} playerId={playerId} />
       </div>
     );
@@ -192,8 +211,10 @@ function App() {
             Leave Room
           </button>
         </div>
-        
-        {volumeControls}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+          {volumeControls}
+          {profileBadge}
+        </div>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -209,8 +230,9 @@ function App() {
         <div>
           <BiddingArena room={room} playerId={playerId} />
         </div>
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
           <RosterDrawer room={room} />
+          <ChatBox room={room} socket={socket} playerId={playerId} />
         </div>
       </div>
 
