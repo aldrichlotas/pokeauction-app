@@ -159,82 +159,85 @@ function App() {
     );
   }
 
-  const volumeControls = (
-    <div className="volume-controls">
-      <div className="volume-slider-group">
-        <label>Music</label>
-        <input type="range" min="0" max="1" step="0.01" value={bgmVol} onChange={handleBgmChange} />
+  const topNav = (
+    <header className="top-nav">
+      <div className="nav-left">
+        <h1 className="nav-logo" onClick={handleLeave} style={{ cursor: 'pointer' }}>PokéDraft</h1>
+        {room && <div className="nav-room-id">ROOM: {room.id}</div>}
       </div>
-      <div className="volume-slider-group">
-        <label>SFX</label>
-        <input type="range" min="0" max="1" step="0.01" value={sfxVol} onChange={handleSfxChange} />
+      <div className="nav-right">
+        <div className="volume-controls">
+          <div className="volume-slider-group">
+            <label>Music</label>
+            <input type="range" min="0" max="1" step="0.01" value={bgmVol} onChange={handleBgmChange} />
+          </div>
+          <div className="volume-slider-group">
+            <label>SFX</label>
+            <input type="range" min="0" max="1" step="0.01" value={sfxVol} onChange={handleSfxChange} />
+          </div>
+        </div>
+        {room && room.players[playerId] && (
+          <div className="profile-badge">
+            <div className="profile-avatar">
+              {room.players[playerId].name.charAt(0).toUpperCase()}
+            </div>
+            <span className="profile-name">{room.players[playerId].name}</span>
+          </div>
+        )}
+        {room && (
+          <button className="btn btn-outline" style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }} onClick={handleLeave}>
+            Leave
+          </button>
+        )}
       </div>
-    </div>
+    </header>
   );
-
-  const profileBadge = room && room.players[playerId] ? (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.1)', padding: '0.5rem 1rem', borderRadius: '50px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
-      <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.8rem', color: 'white' }}>
-        {room.players[playerId].name.charAt(0).toUpperCase()}
-      </div>
-      <span style={{ fontWeight: 600, color: 'white' }}>{room.players[playerId].name}</span>
-    </div>
-  ) : null;
 
   // Lobby State
   if (!room || room.state === 'LOBBY') {
-    return <Lobby room={room} socket={socket} playerId={playerId} onJoin={handleJoin} onLeave={handleLeave} volumeNode={volumeControls} profileBadge={profileBadge} />;
+    return (
+      <>
+        {topNav}
+        <Lobby room={room} socket={socket} playerId={playerId} onJoin={handleJoin} onLeave={handleLeave} />
+      </>
+    );
   }
 
   // Draft End State
   if (room.state === 'DRAFT_END') {
     return (
-      <div className="container" style={{ position: 'relative' }}>
-        <div style={{ position: 'absolute', top: 0, right: 0, zIndex: 10, display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          {profileBadge}
-          <button className="btn btn-secondary" onClick={handleLeave}>
-            Leave Room
-          </button>
+      <>
+        {topNav}
+        <div className="main-container" style={{ alignItems: 'center' }}>
+          <ExportSummary room={room} socket={socket} playerId={playerId} />
         </div>
-        <ExportSummary room={room} socket={socket} playerId={playerId} />
-      </div>
+      </>
     );
   }
 
   // Active Game State (BIDDING or REVEAL)
   return (
-    <div className="container animate-fade-in">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <h1>PokéDraft Auction</h1>
-          <button className="btn btn-outline" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }} onClick={handleLeave}>
-            Leave Room
-          </button>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          {volumeControls}
-          {profileBadge}
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h2 style={{ color: 'var(--accent-color)' }}>Room: {room.id}</h2>
+    <>
+      {topNav}
+      <div className="main-container animate-fade-in">
+        
         {room.currentDraft && (
-          <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-            Round {room.currentDraft.roundNumber}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--accent-color)', letterSpacing: '2px', textTransform: 'uppercase' }}>
+              Round {room.currentDraft.roundNumber}
+            </div>
           </div>
         )}
-      </div>
 
-      <div className="arena-layout">
-        <div>
-          <BiddingArena room={room} playerId={playerId} />
+        <div className="arena-layout">
+          <div>
+            <BiddingArena room={room} playerId={playerId} />
+          </div>
+          <div className="sidebar">
+            <RosterDrawer room={room} />
+            <ChatBox room={room} socket={socket} playerId={playerId} />
+          </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
-          <RosterDrawer room={room} />
-          <ChatBox room={room} socket={socket} playerId={playerId} />
-        </div>
-      </div>
 
       {revealData && room.state === 'REVEAL' && (
         <RevealModal 
@@ -252,7 +255,9 @@ function App() {
           isWinner={autofillData.targetPlayerId === playerId}
         />
       )}
+
     </div>
+    </>
   );
 }
 

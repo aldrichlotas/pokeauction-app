@@ -78,7 +78,7 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
 
   // Calculate timer circle dashoffset (200 is total dasharray)
   const timerPercentage = timeLeft / room.settings.timerDuration;
-  const strokeDashoffset = 200 - (200 * timerPercentage);
+  const strokeDashoffset = 201 - (201 * timerPercentage);
 
   return (
     <div className="glass-panel mystery-card">
@@ -96,7 +96,18 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
         </div>
       </div>
 
-      <div className="mystery-number">#{draft.pokemonId}</div>
+      {room.settings.colorPaletteMode && draft.colorPalette ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', margin: '2rem 0' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '2px' }}>Guess that Pokémon!</div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {draft.colorPalette.map((color: string, i: number) => (
+              <div key={i} style={{ width: '60px', height: '60px', backgroundColor: color, borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.2)' }} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="mystery-number">#{draft.pokemonId}</div>
+      )}
       
       <div className="current-bid-display">
         <div style={{ fontSize: '1.2rem', color: 'var(--text-secondary)' }}>Current Highest Bid</div>

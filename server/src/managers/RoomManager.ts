@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import { Room, Player, DraftState, Match } from '../types';
+import { getFilteredPokemonIds, getPokemonColorPalette } from '../utils/pokemonData';
 
 export class RoomManager {
   private rooms: Map<string, Room> = new Map();
@@ -9,6 +10,18 @@ export class RoomManager {
 
   constructor(io: Server) {
     this.io = io;
+  }
+
+  private broadcastRoomUpdate(roomId: string) {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+    
+    const safeRoom: Room = JSON.parse(JSON.stringify(room));
+    if (safeRoom.settings.colorPaletteMode && safeRoom.state === 'BIDDING' && safeRoom.currentDraft) {
+      safeRoom.currentDraft.pokemonId = null;
+    }
+    
+    this.io.to(roomId).emit('room_update', safeRoom);
   }
 
   createRoom(roomId: string, hostId: string, hostName: string): Room {
@@ -31,6 +44,9 @@ export class RoomManager {
         timerDuration: 30,
         dexStart: 1,
         dexEnd: 1025,
+        pokemonType: null,
+        colorPaletteMode: false,
+        generationFilter: 'All',
       },
       currentDraft: null,
       bracket: null,
@@ -92,20 +108,24 @@ export class RoomManager {
           }
         }
         
-        this.io.to(roomId).emit('room_update', room);
+        this.broadcastRoomUpdate(roomId);
       }
     }
   }
 
-  startDraft(roomId: string) {
+  async startDraft(roomId: string, settings?: Partial<Room['settings']>) {
     const room = this.rooms.get(roomId);
     if (!room || room.state !== 'LOBBY') return;
     
+    if (settings) {
+      room.settings = { ...room.settings, ...settings };
+    }
+    
     room.state = 'BIDDING';
-    this.startNewRound(roomId);
+    await this.startNewRound(roomId);
   }
 
-  private startNewRound(roomId: string) {
+  private async startNewRound(roomId: string) {
     const room = this.rooms.get(roomId);
     if (!room) return;
 
@@ -117,7 +137,7 @@ export class RoomManager {
     if (activePlayers.length === 0) {
       room.state = 'DRAFT_END';
       this.generateBracket(roomId);
-      this.io.to(roomId).emit('room_update', room);
+      this.broadcastRoomUpdate(roomId);
       this.io.to(roomId).emit('draft_complete');
       return;
     }
@@ -128,14 +148,16 @@ export class RoomManager {
       const fillCount = Math.min(emptySlots, p.balance); // $1 per pokemon
       
       const wonPokemonIds: number[] = [];
+      const pool = await getFilteredPokemonIds(room.settings.pokemonType, room.settings.generationFilter);
+      
       for (let i = 0; i < fillCount; i++) {
-        const randomPokemonId = Math.floor(Math.random() * (room.settings.dexEnd - room.settings.dexStart + 1)) + room.settings.dexStart;
+        const randomPokemonId = pool[Math.floor(Math.random() * pool.length)];
         wonPokemonIds.push(randomPokemonId);
       }
       
       if (fillCount > 0) {
         room.state = 'AUTOFILL_ROULETTE';
-        this.io.to(roomId).emit('room_update', room);
+        this.broadcastRoomUpdate(roomId);
         this.io.to(roomId).emit('autofill_start', { targetPlayerId: p.id, wonPokemonIds });
         
         // Wait for roulette animation to finish on client before concluding.
@@ -154,7 +176,7 @@ export class RoomManager {
            if (r) {
              r.state = 'DRAFT_END';
              this.generateBracket(roomId);
-             this.io.to(roomId).emit('room_update', r);
+             this.broadcastRoomUpdate(roomId);
              this.io.to(roomId).emit('draft_complete');
            }
         }, animationTime);
@@ -162,7 +184,7 @@ export class RoomManager {
       } else {
         room.state = 'DRAFT_END';
         this.generateBracket(roomId);
-        this.io.to(roomId).emit('room_update', room);
+        this.broadcastRoomUpdate(roomId);
         this.io.to(roomId).emit('draft_complete');
         return;
       }
@@ -175,7 +197,8 @@ export class RoomManager {
       else p.status = 'active';
     });
 
-    const randomPokemonId = Math.floor(Math.random() * (room.settings.dexEnd - room.settings.dexStart + 1)) + room.settings.dexStart;
+    const pool = await getFilteredPokemonIds(room.settings.pokemonType, room.settings.generationFilter);
+    const randomPokemonId = pool[Math.floor(Math.random() * pool.length)];
 
     const roundNumber = room.currentDraft ? room.currentDraft.roundNumber + 1 : 1;
     let turnRotationIndex = room.currentDraft ? room.currentDraft.turnRotationIndex + 1 : 0;
@@ -196,9 +219,14 @@ export class RoomManager {
     if (!openerId) {
        room.state = 'DRAFT_END';
        this.generateBracket(roomId);
-       this.io.to(roomId).emit('room_update', room);
+       this.broadcastRoomUpdate(roomId);
        this.io.to(roomId).emit('draft_complete');
        return;
+    }
+
+    let colorPalette: string[] | undefined;
+    if (room.settings.colorPaletteMode) {
+      colorPalette = await getPokemonColorPalette(randomPokemonId);
     }
 
     room.currentDraft = {
@@ -207,11 +235,12 @@ export class RoomManager {
       currentBid: 1, // Forced $1 opening bid
       timerEndTimestamp: Date.now() + room.settings.timerDuration * 1000,
       roundNumber,
-      turnRotationIndex
+      turnRotationIndex,
+      colorPalette,
     };
 
     room.state = 'BIDDING';
-    this.io.to(roomId).emit('room_update', room);
+    this.broadcastRoomUpdate(roomId);
     this.startTimer(roomId);
   }
 
@@ -287,7 +316,7 @@ export class RoomManager {
       }
     });
 
-    this.io.to(roomId).emit('room_update', room);
+    this.broadcastRoomUpdate(roomId);
     
     if (playersPassed) {
       this.checkEarlyEnd(roomId);
@@ -305,7 +334,7 @@ export class RoomManager {
     if (room.currentDraft.highestBidderId === playerId) return;
 
     player.status = 'passed';
-    this.io.to(roomId).emit('room_update', room);
+    this.broadcastRoomUpdate(roomId);
     
     this.checkEarlyEnd(roomId);
   }
@@ -336,7 +365,7 @@ export class RoomManager {
     }
 
     room.state = 'REVEAL';
-    this.io.to(roomId).emit('room_update', room);
+    this.broadcastRoomUpdate(roomId);
     
     // Send full pokemon details for reveal payload
     this.io.to(roomId).emit('round_resolved', {
@@ -346,8 +375,8 @@ export class RoomManager {
     });
 
     // 5-second transition pause
-    setTimeout(() => {
-       this.startNewRound(roomId);
+    setTimeout(async () => {
+       await this.startNewRound(roomId);
     }, 5000);
   }
 
@@ -400,10 +429,10 @@ export class RoomManager {
         }
       }
       
-      this.io.to(roomId).emit('room_update', room);
+      this.broadcastRoomUpdate(roomId);
     } else {
       // Broadcast updated play again statuses
-      this.io.to(roomId).emit('room_update', room);
+      this.broadcastRoomUpdate(roomId);
     }
   }
 
@@ -544,7 +573,7 @@ export class RoomManager {
        r++;
     }
     
-     this.io.to(roomId).emit('room_update', room);
+     this.broadcastRoomUpdate(roomId);
   }
 
   sendChat(roomId: string, senderId: string, text: string) {
@@ -587,11 +616,11 @@ export class RoomManager {
         if (r && r.activeVote && r.activeVote.targetId === targetPlayer.id) {
           r.activeVote = null;
           this.sendSystemMessage(roomId, `Vote to kick ${targetPlayer.name} failed (Timeout).`);
-          this.io.to(roomId).emit('room_update', r);
+          this.broadcastRoomUpdate(roomId);
         }
       }, 30000);
 
-      this.io.to(roomId).emit('room_update', room);
+      this.broadcastRoomUpdate(roomId);
       return; // Do not emit the command text as a chat message
     }
 
@@ -616,7 +645,7 @@ export class RoomManager {
       room.chatMessages.shift(); // Keep only last 50
     }
 
-    this.io.to(roomId).emit('room_update', room);
+    this.broadcastRoomUpdate(roomId);
   }
 
   sendSystemMessage(roomId: string, text: string) {
@@ -629,7 +658,7 @@ export class RoomManager {
       text,
       timestamp: Date.now(),
     });
-    this.io.to(roomId).emit('room_update', room);
+    this.broadcastRoomUpdate(roomId);
   }
 
   castVote(roomId: string, voterId: string, vote: 'yes' | 'no') {
@@ -664,6 +693,6 @@ export class RoomManager {
       this.sendSystemMessage(roomId, `Vote failed. Not enough players voted yes.`);
     }
 
-    this.io.to(roomId).emit('room_update', room);
+    this.broadcastRoomUpdate(roomId);
   }
 }

@@ -35,15 +35,18 @@ export function ChatBox({ room, socket, playerId }: ChatBoxProps) {
     <div className="glass-panel" style={{ 
       display: 'flex', 
       flexDirection: 'column',
-      height: '400px',
+      flex: 1,
       width: '100%',
       overflow: 'hidden'
     }}>
       <div style={{
         padding: '1rem',
         borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-        fontWeight: 600,
-        background: 'rgba(0, 0, 0, 0.2)'
+        fontWeight: 700,
+        fontFamily: 'var(--font-heading)',
+        letterSpacing: '1px',
+        textTransform: 'uppercase',
+        background: 'rgba(0, 0, 0, 0.3)'
       }}>
         Room Chat
       </div>

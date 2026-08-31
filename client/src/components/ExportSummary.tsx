@@ -58,7 +58,7 @@ export const ExportSummary = ({
   const isHost = room.players[playerId]?.isHost;
 
   return (
-    <div className="container animate-fade-in" style={{ maxWidth: '1200px' }}>
+    <div className="animate-fade-in" style={{ maxWidth: '1200px', width: '100%' }}>
       <h1 style={{ textAlign: 'center', marginBottom: '1rem' }}>Tournament Bracket</h1>
       
       {/* Tournament Bracket UI */}

@@ -53,8 +53,8 @@ io.on('connection', (socket) => {
   });
   
   // Game Actions
-  socket.on('start_draft', (roomId) => {
-    roomManager.startDraft(roomId);
+  socket.on('start_draft', ({ roomId, settings }) => {
+    roomManager.startDraft(roomId, settings);
   });
   
   socket.on('place_bid', ({ roomId, amount }) => {

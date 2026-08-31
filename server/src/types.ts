@@ -48,6 +48,9 @@ export interface Room {
     timerDuration: number;
     dexStart: number;
     dexEnd: number;
+    pokemonType: string | null;
+    colorPaletteMode: boolean;
+    generationFilter: string;
   };
   currentDraft: {
     pokemonId: number | null;
@@ -56,6 +59,7 @@ export interface Room {
     timerEndTimestamp: number | null;
     roundNumber: number;
     turnRotationIndex: number;
+    colorPalette?: string[];
   } | null;
   bracket: Match[][] | null;
   activeVote: ActiveVote | null;
