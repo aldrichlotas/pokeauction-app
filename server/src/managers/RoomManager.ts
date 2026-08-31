@@ -44,9 +44,9 @@ export class RoomManager {
         timerDuration: 30,
         dexStart: 1,
         dexEnd: 1025,
-        pokemonType: null,
+        pokemonType: [],
         colorPaletteMode: false,
-        generationFilter: 'All',
+        generationFilter: [],
       },
       currentDraft: null,
       bracket: null,
@@ -65,7 +65,7 @@ export class RoomManager {
        return room;
     }
 
-    if (room.state !== 'LOBBY') return null;
+    const isSpectator = room.state !== 'LOBBY';
 
     let finalName = playerName.trim();
     let counter = 1;
@@ -79,12 +79,13 @@ export class RoomManager {
     room.players[playerId] = {
       id: playerId,
       name: finalName,
-      balance: 25,
+      balance: isSpectator ? 0 : 25,
       party: [],
-      status: 'active',
+      status: isSpectator ? 'passed' : 'active',
       isHost: false,
       ready: true,
       isOnline: true,
+      isSpectator,
     };
     return room;
   }
@@ -148,7 +149,7 @@ export class RoomManager {
       const fillCount = Math.min(emptySlots, p.balance); // $1 per pokemon
       
       const wonPokemonIds: number[] = [];
-      const pool = await getFilteredPokemonIds(room.settings.pokemonType, room.settings.generationFilter);
+      const pool = await getFilteredPokemonIds(room.settings.pokemonType || [], room.settings.generationFilter || []);
       
       for (let i = 0; i < fillCount; i++) {
         const randomPokemonId = pool[Math.floor(Math.random() * pool.length)];
@@ -192,12 +193,13 @@ export class RoomManager {
 
     // Reset statuses for active players
     Object.values(room.players).forEach(p => {
+      if (p.isSpectator) return;
       if (p.party.length >= 6) p.status = 'full';
       else if (p.balance <= 0) p.status = 'bankrupt';
       else p.status = 'active';
     });
 
-    const pool = await getFilteredPokemonIds(room.settings.pokemonType, room.settings.generationFilter);
+    const pool = await getFilteredPokemonIds(room.settings.pokemonType || [], room.settings.generationFilter || []);
     const randomPokemonId = pool[Math.floor(Math.random() * pool.length)];
 
     const roundNumber = room.currentDraft ? room.currentDraft.roundNumber + 1 : 1;
@@ -419,6 +421,7 @@ export class RoomManager {
           p.status = 'active';
           p.wantsToPlayAgain = false;
           p.ready = false; // Force them to explicitly ready up again in the lobby
+          p.isSpectator = false; // Spectators become active players
         }
       });
 
@@ -440,7 +443,7 @@ export class RoomManager {
     const room = this.rooms.get(roomId);
     if (!room) return;
 
-    const players = Object.values(room.players).filter(p => p.party.length > 0);
+    const players = Object.values(room.players).filter(p => p.party.length > 0 && !p.isSpectator);
     if (players.length < 2) {
       room.bracket = null;
       return;

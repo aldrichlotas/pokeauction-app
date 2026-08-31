@@ -92,40 +92,29 @@ io.on('connection', (socket) => {
     if (playerId) {
       const room = roomManager['rooms'].get(roomId);
       if (room) {
-        if (room.state === 'LOBBY') {
-          delete room.players[playerId];
-          socket.leave(roomId);
-          
-          if (Object.keys(room.players).length === 0) {
-            roomManager['rooms'].delete(roomId);
-          } else {
-            const remainingPlayers = Object.values(room.players);
-            if (!remainingPlayers.some((p: any) => p.isHost)) {
-              (remainingPlayers[0] as any).isHost = true;
-            }
-            io.to(roomId).emit('room_update', room);
-          }
+        socket.leave(roomId);
+        delete room.players[playerId];
+
+        if (Object.keys(room.players).length === 0) {
+          roomManager['rooms'].delete(roomId);
         } else {
-          // Leave the socket room immediately so this player doesn't receive the room_update broadcast
-          socket.leave(roomId);
-          
-          // If they leave during or after the game, mark them permanently bankrupt and offline
-          // This avoids deleting the object which could break turn-order loops
-          if (room.players[playerId]) {
-            room.players[playerId].isOnline = false;
-            room.players[playerId].status = 'bankrupt';
-            // Also pass them if they were active
-            if (room.currentDraft?.highestBidderId !== playerId) {
-               // they are not highest bidder, so it's safe to early end if they were the last active
-               roomManager['checkEarlyEnd'](roomId);
-            }
-            
-            if (room.state === 'DRAFT_END') {
-               roomManager.checkPlayAgainReady(roomId);
-            }
-            
-            io.to(roomId).emit('room_update', room);
+          const remainingPlayers = Object.values(room.players);
+          if (!remainingPlayers.some((p: any) => p.isHost)) {
+            (remainingPlayers[0] as any).isHost = true;
           }
+          
+          if (room.state === 'BIDDING') {
+             if (room.currentDraft?.highestBidderId === playerId) {
+                 // Reset the bid if the highest bidder leaves
+                 room.currentDraft.highestBidderId = null;
+                 room.currentDraft.currentBid = 1; 
+             }
+             roomManager['checkEarlyEnd'](roomId);
+          } else if (room.state === 'DRAFT_END') {
+             roomManager.checkPlayAgainReady(roomId);
+          }
+          
+          io.to(roomId).emit('room_update', room);
         }
       }
     }

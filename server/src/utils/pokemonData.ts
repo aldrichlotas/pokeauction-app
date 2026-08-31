@@ -26,30 +26,41 @@ function extractIdFromUrl(url: string): number {
  * Gets a list of Pokemon IDs matching the specified Type and/or Generation.
  * If both are null, returns the National Dex (1-1025).
  */
-export async function getFilteredPokemonIds(type: string | null, generation: string | null): Promise<number[]> {
+export async function getFilteredPokemonIds(types: string[], generations: string[]): Promise<number[]> {
   let typeIds: Set<number> | null = null;
   let genIds: Set<number> | null = null;
 
-  if (type && type.toLowerCase() !== 'any') {
-    try {
-      const data = await fetchWithCache(`${POKEAPI_BASE}/type/${type.toLowerCase()}`);
-      typeIds = new Set(data.pokemon.map((p: any) => extractIdFromUrl(p.pokemon.url)).filter((id: number) => id <= 1025));
-    } catch (e) {
-      console.error(`Error fetching type ${type}:`, e);
+  if (types && types.length > 0 && !types.includes('Any')) {
+    typeIds = new Set();
+    for (const type of types) {
+      try {
+        const data = await fetchWithCache(`${POKEAPI_BASE}/type/${type.toLowerCase()}`);
+        data.pokemon.forEach((p: any) => {
+          const id = extractIdFromUrl(p.pokemon.url);
+          if (id <= 1025) typeIds!.add(id);
+        });
+      } catch (e) {
+        console.error(`Error fetching type ${type}:`, e);
+      }
     }
   }
 
-  if (generation && generation.toLowerCase() !== 'all') {
-    try {
-      // Map frontend generation strings to PokeAPI IDs (e.g., "Gen 1 (Kanto)" -> 1)
-      const genMatch = generation.match(/Gen (\d+)/i);
-      if (genMatch) {
-        const genNum = genMatch[1];
-        const data = await fetchWithCache(`${POKEAPI_BASE}/generation/${genNum}`);
-        genIds = new Set(data.pokemon_species.map((p: any) => extractIdFromUrl(p.url)).filter((id: number) => id <= 1025));
+  if (generations && generations.length > 0 && !generations.includes('All')) {
+    genIds = new Set();
+    for (const gen of generations) {
+      try {
+        const genMatch = gen.match(/Gen (\d+)/i);
+        if (genMatch) {
+          const genNum = genMatch[1];
+          const data = await fetchWithCache(`${POKEAPI_BASE}/generation/${genNum}`);
+          data.pokemon_species.forEach((p: any) => {
+            const id = extractIdFromUrl(p.url);
+            if (id <= 1025) genIds!.add(id);
+          });
+        }
+      } catch (e) {
+        console.error(`Error fetching generation ${gen}:`, e);
       }
-    } catch (e) {
-      console.error(`Error fetching generation ${generation}:`, e);
     }
   }
 

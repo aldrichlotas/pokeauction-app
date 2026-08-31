@@ -14,6 +14,21 @@ export const RosterDrawer = ({ room }: RosterDrawerProps) => {
       {players.map((p: any, index: number) => {
         const isOpener = room.currentDraft && room.currentDraft.turnRotationIndex === index;
         
+        if (p.isSpectator) {
+          return (
+            <div key={p.id} className="glass-panel player-card" style={{ opacity: 0.7, border: '1px solid var(--accent-color)', background: 'linear-gradient(135deg, rgba(0,240,255,0.1), transparent)' }}>
+              <div className="player-card-header" style={{ marginBottom: 0 }}>
+                <span className="player-name">
+                  {p.name}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--accent-color)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 800, background: 'rgba(0, 240, 255, 0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
+                  Spectating
+                </span>
+              </div>
+            </div>
+          );
+        }
+        
         return (
           <div key={p.id} className={`glass-panel player-card ${isOpener ? 'opener-highlight' : ''}`}>
             <div className="player-card-header">

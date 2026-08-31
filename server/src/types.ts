@@ -9,6 +9,7 @@ export interface Player {
   isHost: boolean;
   ready: boolean;
   isOnline: boolean;
+  isSpectator?: boolean;
   wantsToPlayAgain?: boolean;
 }
 
@@ -48,9 +49,9 @@ export interface Room {
     timerDuration: number;
     dexStart: number;
     dexEnd: number;
-    pokemonType: string | null;
+    pokemonType: string[];
     colorPaletteMode: boolean;
-    generationFilter: string;
+    generationFilter: string[];
   };
   currentDraft: {
     pokemonId: number | null;

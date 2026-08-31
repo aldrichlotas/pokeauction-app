@@ -181,7 +181,14 @@ function App() {
             <div className="profile-avatar">
               {room.players[playerId].name.charAt(0).toUpperCase()}
             </div>
-            <span className="profile-name">{room.players[playerId].name}</span>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span className="profile-name">{room.players[playerId].name}</span>
+              {room.players[playerId].isSpectator && (
+                <span style={{ fontSize: '0.7rem', color: 'var(--accent-color)', fontWeight: 800, textTransform: 'uppercase' }}>
+                  Spectator
+                </span>
+              )}
+            </div>
           </div>
         )}
         {room && (

@@ -130,8 +130,13 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
         </div>
       )}
 
-      <div className="action-bar">
-        {isActive ? (
+      <div className="action-bar" style={{ display: 'flex', justifyContent: 'center' }}>
+        {player.isSpectator ? (
+          <div className="glass-panel animate-pulse" style={{ padding: '1.5rem 2rem', color: 'var(--accent-color)', fontWeight: 800, fontSize: '1.2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '0.5rem', border: '1px solid var(--accent-color)' }}>
+            <span style={{ fontSize: '1.5rem', letterSpacing: '2px', textTransform: 'uppercase' }}>Spectating Mode</span>
+            <span style={{ color: 'var(--text-secondary)', fontWeight: 400, fontSize: '1rem' }}>Enjoy the show! You will automatically join the next draft.</span>
+          </div>
+        ) : isActive ? (
           <>
             <button 
               className="btn btn-primary" 
