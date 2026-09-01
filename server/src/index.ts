@@ -93,19 +93,27 @@ io.on('connection', (socket) => {
       const room = roomManager['rooms'].get(roomId);
       if (room) {
         socket.leave(roomId);
-        delete room.players[playerId];
+        if (room.state === 'LOBBY') {
+          delete room.players[playerId];
+        } else {
+          if (room.players[playerId]) {
+            room.players[playerId].isOnline = false;
+          }
+        }
 
         if (Object.keys(room.players).length === 0) {
           roomManager['rooms'].delete(roomId);
         } else {
-          const remainingPlayers = Object.values(room.players);
-          if (!remainingPlayers.some((p: any) => p.isHost)) {
+          const remainingPlayers = Object.values(room.players).filter(p => (p as any).isOnline !== false || room.state !== 'LOBBY');
+          if (remainingPlayers.length > 0 && !remainingPlayers.some((p: any) => p.isHost)) {
             (remainingPlayers[0] as any).isHost = true;
           }
           
           if (room.state === 'BIDDING') {
+             if (room.players[playerId]) {
+               room.players[playerId].status = 'passed';
+             }
              if (room.currentDraft?.highestBidderId === playerId) {
-                 // Reset the bid if the highest bidder leaves
                  room.currentDraft.highestBidderId = null;
                  room.currentDraft.currentBid = 1; 
              }

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Socket } from 'socket.io-client';
+import { audio } from '../utils/audio';
 
 export const Lobby = ({ 
   room, 
@@ -15,7 +16,18 @@ export const Lobby = ({
 }) => {
   const [playerName, setPlayerName] = useState('');
   const [roomIdInput, setRoomIdInput] = useState('');
+  const previousPlayerCount = useRef<number>(0);
 
+  useEffect(() => {
+    if (room && room.players) {
+      const currentCount = Object.keys(room.players).length;
+      // Play join sound if someone new joins
+      if (currentCount > previousPlayerCount.current && previousPlayerCount.current !== 0) {
+        audio.playPlayerJoinSound();
+      }
+      previousPlayerCount.current = currentCount;
+    }
+  }, [room?.players]);
   // Host Settings
   const [timerDuration, setTimerDuration] = useState(30);
   const [pokemonType, setPokemonType] = useState<string[]>(['Any']);
@@ -23,6 +35,7 @@ export const Lobby = ({
   const [colorPaletteMode, setColorPaletteMode] = useState(false);
 
   const handleGenToggle = (gen: string) => {
+    audio.playUIClick();
     if (gen === 'All') {
       setGenerationFilter(['All']);
       return;
@@ -38,6 +51,7 @@ export const Lobby = ({
   };
 
   const handleTypeToggle = (type: string) => {
+    audio.playUIClick();
     if (type === 'Any') {
       setPokemonType(['Any']);
       return;
@@ -53,6 +67,7 @@ export const Lobby = ({
   };
 
   const handleCreate = () => {
+    audio.playUIClick();
     if (!playerName) return;
     localStorage.setItem('poke_auction_name', playerName);
     socket.emit('create_room', { playerName, playerId }, (response: any) => {
@@ -62,6 +77,7 @@ export const Lobby = ({
   };
 
   const handleJoin = () => {
+    audio.playUIClick();
     if (!playerName || !roomIdInput) return;
     localStorage.setItem('poke_auction_name', playerName);
     socket.emit('join_room', { roomId: roomIdInput.toUpperCase(), playerName, playerId }, (response: any) => {
@@ -165,12 +181,12 @@ export const Lobby = ({
                   <label className="settings-label" style={{ marginBottom: 0 }}>Timer</label>
                   <span style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '1.1rem' }}>{timerDuration}s</span>
                 </div>
-                <input type="range" min="5" max="120" step="5" className="input-field" style={{ padding: 0, height: '4px', background: 'rgba(255,255,255,0.2)' }} value={timerDuration} onChange={e => setTimerDuration(parseInt(e.target.value) || 30)} />
+                <input type="range" min="5" max="120" step="5" className="input-field" style={{ padding: 0, height: '4px', background: 'rgba(255,255,255,0.2)' }} value={timerDuration} onChange={e => { audio.playUIClick(); setTimerDuration(parseInt(e.target.value) || 30); }} />
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', justifyContent: 'center' }}>
                 <label className="checkbox-wrapper" style={{ marginTop: '0.5rem' }}>
-                  <input type="checkbox" checked={colorPaletteMode} onChange={e => setColorPaletteMode(e.target.checked)} />
+                  <input type="checkbox" checked={colorPaletteMode} onChange={e => { audio.playUIClick(); setColorPaletteMode(e.target.checked); }} />
                   <span style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>Color Palette Mode</span>
                 </label>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: '2.2rem', marginTop: '-0.2rem' }}>Draft Pokémon based entirely on their color scheme!</span>

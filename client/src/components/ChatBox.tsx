@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Socket } from 'socket.io-client';
+import { audio } from '../utils/audio';
 
 interface ChatMessage {
   id: string;
@@ -18,9 +19,22 @@ interface ChatBoxProps {
 export function ChatBox({ room, socket, playerId }: ChatBoxProps) {
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const previousMessageCount = useRef<number>(0);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    
+    if (room.chatMessages) {
+      const currentCount = room.chatMessages.length;
+      if (currentCount > previousMessageCount.current && previousMessageCount.current !== 0) {
+        // Only play if the last message wasn't from us
+        const lastMsg = room.chatMessages[currentCount - 1];
+        if (lastMsg && lastMsg.senderId !== playerId) {
+          audio.playChatSound();
+        }
+      }
+      previousMessageCount.current = currentCount;
+    }
   }, [room.chatMessages]);
 
   const handleSend = (e: React.FormEvent) => {
@@ -51,7 +65,7 @@ export function ChatBox({ room, socket, playerId }: ChatBoxProps) {
         Room Chat
       </div>
       
-      <div style={{
+      <div className="chat-messages" style={{
         flex: 1,
         overflowY: 'auto',
         padding: '1rem',

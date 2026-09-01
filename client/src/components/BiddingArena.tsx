@@ -6,6 +6,8 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
   const [timeLeft, setTimeLeft] = useState(room.settings.timerDuration);
   const [customBid, setCustomBid] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isShaking, setIsShaking] = useState(false);
+  const [isBidPopping, setIsBidPopping] = useState(false);
 
   const draft = room.currentDraft;
   const player = room.players[playerId];
@@ -13,6 +15,16 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
 
   const previousBidRef = useRef(room.currentDraft?.currentBid || 0);
   const prevStatusRef = useRef(player.status);
+  const previousRoundRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (draft && draft.roundNumber > previousRoundRef.current) {
+      if (draft.highestBidderId === playerId) {
+        audio.playYourTurnSound();
+      }
+      previousRoundRef.current = draft.roundNumber;
+    }
+  }, [draft?.roundNumber, draft?.highestBidderId, playerId]);
 
   useEffect(() => {
     const handleReject = (data: { reason: string }) => {
@@ -27,10 +39,21 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
 
   useEffect(() => {
     if (draft && draft.currentBid > previousBidRef.current) {
-      audio.playBidSound();
+      audio.playBidSound(draft.currentBid, player.balance);
+      
+      // Trigger bid update pop animation
+      setIsBidPopping(true);
+      setTimeout(() => setIsBidPopping(false), 300);
+      
+      // If the bid increased by a huge margin (>= 50% of our balance), shake the screen!
+      const bidDiff = draft.currentBid - previousBidRef.current;
+      if (bidDiff >= player.balance * 0.5 && player.balance > 0) {
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 400);
+      }
     }
     previousBidRef.current = draft ? draft.currentBid : 0;
-  }, [draft?.currentBid]);
+  }, [draft?.currentBid, player.balance]);
 
   useEffect(() => {
     if (prevStatusRef.current === 'active' && player.status === 'passed') {
@@ -45,7 +68,7 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
       const remaining = Math.max(0, Math.ceil((draft.timerEndTimestamp - Date.now()) / 1000));
       setTimeLeft((prev: number) => {
         if (prev !== remaining && remaining <= 5 && remaining > 0) {
-          audio.playTickSound();
+          audio.playTickSound(remaining);
         }
         return remaining;
       });
@@ -81,7 +104,7 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
   const strokeDashoffset = 201 - (201 * timerPercentage);
 
   return (
-    <div className="glass-panel mystery-card">
+    <div className={`glass-panel mystery-card ${isShaking ? 'shake-active' : ''}`}>
       <div className="timer-container">
         <svg className="timer-svg" viewBox="0 0 80 80">
           <circle className="timer-circle-bg" cx="40" cy="40" r="32" />
@@ -111,7 +134,7 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
       
       <div className="current-bid-display">
         <div style={{ fontSize: '1.2rem', color: 'var(--text-secondary)' }}>Current Highest Bid</div>
-        <div className="bid-amount">${currentBid}</div>
+        <div className={`bid-amount ${isBidPopping ? 'bid-update' : ''}`}>${currentBid}</div>
         <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>by {highestBidder}</div>
       </div>
 
@@ -140,14 +163,14 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
           <>
             <button 
               className="btn btn-primary" 
-              onClick={() => placeBid(minBid)} 
+              onClick={() => { audio.playUIClick(); placeBid(minBid); }} 
               disabled={minBid > maxBid}
             >
               Bid ${minBid}
             </button>
             <button 
               className="btn btn-primary" 
-              onClick={() => placeBid(currentBid + 2)} 
+              onClick={() => { audio.playUIClick(); placeBid(currentBid + 2); }} 
               disabled={currentBid + 2 > maxBid}
             >
               + $2
@@ -156,6 +179,8 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
               className="btn btn-primary" 
               onClick={() => {
                 audio.playAllInSound();
+                setIsShaking(true);
+                setTimeout(() => setIsShaking(false), 400);
                 placeBid(maxBid);
               }} 
               disabled={maxBid <= currentBid}
@@ -176,7 +201,7 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
               />
               <button 
                 className="btn btn-outline" 
-                onClick={handleCustomBid}
+                onClick={() => { audio.playUIClick(); handleCustomBid(); }}
                 disabled={!customBid || parseInt(customBid) < minBid || parseInt(customBid) > maxBid}
               >
                 Bid
@@ -184,7 +209,7 @@ export const BiddingArena = ({ room, playerId }: { room: any, playerId: string }
             </div>
             
             {!isHighestBidder && (
-              <button className="btn btn-danger" onClick={passBid}>Pass / Fold</button>
+              <button className="btn btn-danger" onClick={() => { audio.playUIClick(); passBid(); }}>Pass / Fold</button>
             )}
             
             {isHighestBidder && (
