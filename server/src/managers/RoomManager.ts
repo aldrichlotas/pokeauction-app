@@ -10,6 +10,22 @@ export class RoomManager {
 
   constructor(io: Server) {
     this.io = io;
+    
+    // Memory Leak Prevention: Sweep for empty abandoned rooms every 30 minutes
+    setInterval(() => {
+      for (const [roomId, room] of this.rooms.entries()) {
+        const players = Object.values(room.players) as any[];
+        // If everyone is disconnected and there is at least one player in history
+        if (players.length > 0 && players.every(p => p.isOnline === false)) {
+          if (this.timers.has(roomId)) {
+            clearTimeout(this.timers.get(roomId)!);
+            this.timers.delete(roomId);
+          }
+          this.rooms.delete(roomId);
+          console.log(`[Sweeper] Deleted abandoned room: ${roomId}`);
+        }
+      }
+    }, 30 * 60 * 1000);
   }
 
   private broadcastRoomUpdate(roomId: string) {
@@ -211,7 +227,7 @@ export class RoomManager {
     for (let i = 0; i < playerIds.length; i++) {
       const idx = (turnRotationIndex + i) % playerIds.length;
       const p = room.players[playerIds[idx]];
-      if (p.status === 'active' && p.balance >= 1) {
+      if (p.status === 'active' && p.balance >= 1 && p.isOnline !== false) {
         openerId = p.id;
         turnRotationIndex = idx;
         break;

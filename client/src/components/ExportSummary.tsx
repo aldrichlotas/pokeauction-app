@@ -58,10 +58,12 @@ export const ExportSummary = ({
   const isHost = room.players[playerId]?.isHost;
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: '1200px', width: '100%' }}>
-      <h1 style={{ textAlign: 'center', marginBottom: '1rem' }}>Tournament Bracket</h1>
+    <div className="arena-layout animate-fade-in" style={{ width: '100%', height: '100%' }}>
       
-      {/* Tournament Bracket UI */}
+      {/* Left Column: Tournament Bracket */}
+      <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <h1 style={{ textAlign: 'center', marginBottom: '1rem', flexShrink: 0 }}>Tournament Bracket</h1>
+        <div style={{ flex: 1, overflow: 'auto', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
       {room.bracket && (
         <div style={{
           display: 'flex', 
@@ -143,51 +145,61 @@ export const ExportSummary = ({
           ))}
         </div>
       )}
-      
-      {/* Exporter Section */}
-      <h2 style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Showdown Exporter</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-        {(Object.values(room.players) as any[]).map(p => {
-          if (!teamData[p.id]) return null;
-          
-          return (
-            <div key={p.id} className="glass-panel" style={{ padding: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ margin: 0 }}>{p.name}</h3>
-                <button 
-                  className="btn btn-outline" 
-                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
-                  onClick={() => handleCopy(p.id)}
-                >
-                  {copied === p.id ? 'Copied!' : 'Copy'}
-                </button>
-              </div>
-              
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {teamData[p.id].map(pokemon => (
-                  <img key={pokemon.id} src={pokemon.spriteUrl} alt={pokemon.name} title={pokemon.name} style={{ width: '40px', height: '40px', objectFit: 'contain', background: 'rgba(0,0,0,0.2)', borderRadius: '4px' }} />
-                ))}
-              </div>
-            </div>
-          );
-        })}
       </div>
-      
-      {/* Play Again Controls */}
-      <div style={{ marginTop: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-        <button 
-          className={`btn ${room.players[playerId]?.wantsToPlayAgain ? 'btn-secondary' : 'btn-primary'}`}
-          style={{ width: '300px', height: '60px', fontSize: '1.25rem', fontWeight: 800 }}
-          onClick={() => {
-            audio.playUIClick();
-            socket.emit('play_again', { roomId: room.id });
-          }}
-        >
-          {room.players[playerId]?.wantsToPlayAgain ? 'Ready (Waiting...)' : 'Play Again'}
-        </button>
+    </div>
+    
+    {/* Right Column: Exporter Sidebar & Play Again */}
+      <div className="sidebar export-sidebar" style={{ display: 'flex', flexDirection: 'column', padding: '1.5rem', gap: '1.5rem', background: 'rgba(20,20,30,0.6)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', overflowY: 'auto' }}>
+        <h2 style={{ textAlign: 'center', color: 'var(--accent-color)', fontSize: '1.4rem', borderBottom: '1px solid rgba(0, 240, 255, 0.3)', paddingBottom: '0.5rem' }}>Final Rosters</h2>
         
-        <div style={{ color: 'var(--text-secondary)' }}>
-          {Object.values(room.players).filter((p: any) => p.isOnline && p.wantsToPlayAgain).length} / {Object.values(room.players).filter((p: any) => p.isOnline).length} Players Ready
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, overflowY: 'auto' }}>
+          {(Object.values(room.players) as any[]).map(p => {
+            if (!teamData[p.id]) return null;
+            
+            return (
+              <div key={p.id} className="glass-panel" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div className="profile-avatar" style={{ width: '24px', height: '24px', fontSize: '0.8rem' }}>
+                      {p.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="profile-name">{p.name}</span>
+                  </div>
+                  <button 
+                    className={`btn ${copied === p.id ? 'btn-secondary' : 'btn-outline'}`}
+                    style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    onClick={() => handleCopy(p.id)}
+                  >
+                    {copied === p.id ? '✓ Copied' : '📋 Copy'}
+                  </button>
+                </div>
+                
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                  {teamData[p.id].map(pokemon => (
+                    <img key={pokemon.id} src={pokemon.spriteUrl} alt={pokemon.name} title={pokemon.name} style={{ width: '32px', height: '32px', objectFit: 'contain', background: 'rgba(0,0,0,0.2)', borderRadius: '4px' }} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        
+        {/* Play Again Controls */}
+        <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+          <button 
+            className={`btn ${room.players[playerId]?.wantsToPlayAgain ? 'btn-secondary' : 'btn-primary'}`}
+            style={{ width: '100%', height: '50px', fontSize: '1.1rem', fontWeight: 800 }}
+            onClick={() => {
+              audio.playUIClick();
+              socket.emit('play_again', { roomId: room.id });
+            }}
+          >
+            {room.players[playerId]?.wantsToPlayAgain ? 'Ready (Waiting...)' : 'Play Again'}
+          </button>
+          
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+            {Object.values(room.players).filter((p: any) => p.isOnline && p.wantsToPlayAgain).length} / {Object.values(room.players).filter((p: any) => p.isOnline).length} Players Ready
+          </div>
         </div>
       </div>
     </div>

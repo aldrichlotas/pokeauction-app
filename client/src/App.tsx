@@ -215,7 +215,7 @@ function App() {
     return (
       <>
         {topNav}
-        <div className="main-container" style={{ alignItems: 'center' }}>
+        <div className="main-container">
           <ExportSummary room={room} socket={socket} playerId={playerId} />
         </div>
       </>
